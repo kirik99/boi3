@@ -6,13 +6,10 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
-import OpenAI from "openai";
 
-// Configure OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+// Configure OpenRouter
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 // Configure Multer for file uploads
 const uploadDir = path.join(process.cwd(), "client", "public", "uploads");
@@ -36,9 +33,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Serve uploaded files statically - handled by Vite in dev or static middleware in prod?
-  // client/public is served at root.
-
   app.post("/api/upload", upload.single("image"), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
@@ -81,15 +75,19 @@ export async function registerRoutes(
       const conversationId = parseInt(req.params.id);
       const { content, imageUrl } = req.body;
 
+      if (!OPENROUTER_API_KEY) {
+        return res.status(500).json({ message: "OPENROUTER_API_KEY is not configured" });
+      }
+
       // 1. Save User Message
-      const userMessage = await storage.createMessage({
+      await storage.createMessage({
         conversationId,
         role: "user",
         content,
         imageUrl,
       });
 
-      // 2. Prepare context for OpenAI
+      // 2. Prepare context for OpenRouter
       const history = await storage.getMessages(conversationId);
       
       const apiMessages = history.map((msg) => {
@@ -116,7 +114,6 @@ export async function registerRoutes(
         }
       });
 
-      // System prompt
       const systemMessage = {
         role: "system",
         content: `You are a multimodal AI agent. 
@@ -141,21 +138,56 @@ Agent actions:
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      // 3. Call OpenAI with streaming
-      const stream = await openai.chat.completions.create({
-        model: "gpt-5.2",
-        messages: [systemMessage, ...apiMessages] as any,
-        max_completion_tokens: 1000,
-        stream: true,
+      // 3. Call OpenRouter with streaming
+      const response = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://replit.com", // Optional, for OpenRouter rankings
+          "X-Title": "Replit Multi-modal Agent", // Optional
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-4o", // Or any other model supported by OpenRouter
+          messages: [systemMessage, ...apiMessages],
+          stream: true,
+        }),
       });
 
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`OpenRouter Error: ${error}`);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
       let assistantContent = "";
 
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        if (content) {
-          assistantContent += content;
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const dataStr = line.slice(6).trim();
+              if (dataStr === "[DONE]") continue;
+              
+              try {
+                const data = JSON.parse(dataStr);
+                const content = data.choices[0]?.delta?.content || "";
+                if (content) {
+                  assistantContent += content;
+                  res.write(`data: ${JSON.stringify({ content })}\n\n`);
+                }
+              } catch (e) {
+                // Ignore parse errors for incomplete lines
+              }
+            }
+          }
         }
       }
 
@@ -170,7 +202,7 @@ Agent actions:
       res.end();
 
     } catch (error: any) {
-      console.error("OpenAI Error:", error);
+      console.error("Agent Error:", error);
       if (!res.headersSent) {
         res.status(500).json({ message: error.message || "Internal Server Error" });
       } else {
