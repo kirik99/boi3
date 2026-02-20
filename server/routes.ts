@@ -6,6 +6,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
+import { ragSearch, listDocuments, listChunks } from "./rag";
 
 // Configure OpenRouter
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -33,6 +34,15 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // RAG: Search document chunks
+  app.post("/api/search", ragSearch);
+  
+  // RAG: Get all documents
+  app.get("/api/documents", listDocuments);
+  
+  // RAG: Get all chunks
+  app.get("/api/chunks", listChunks);
+
   app.post("/api/upload", upload.single("image"), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });

@@ -1,4 +1,4 @@
-import { type Express } from "express";
+import express, { type Express } from "express";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
 import viteConfig from "../vite.config";
@@ -30,6 +30,9 @@ export async function setupVite(server: Server, app: Express) {
   });
 
   app.use(vite.middlewares);
+
+  // Serve static files from client directory (e.g., test.html)
+  app.use(express.static(path.resolve(import.meta.dirname, "..", "client")));
 
   app.use("/{*path}", async (req, res, next) => {
     const url = req.originalUrl;

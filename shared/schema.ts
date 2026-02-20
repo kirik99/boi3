@@ -1,6 +1,6 @@
 
-import { sqliteTable, text, integer, primaryKey } from "drizzle-orm/sqlite-core";
-import { relations, sql } from "drizzle-orm";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,7 +8,7 @@ import { z } from "zod";
 export const conversations = sqliteTable("conversations", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
-  createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
 export const messages = sqliteTable("messages", {
@@ -17,7 +17,7 @@ export const messages = sqliteTable("messages", {
   role: text("role").notNull(), // 'user' or 'assistant'
   content: text("content").notNull(),
   imageUrl: text("image_url"), // Optional image URL
-  createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+  createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
 // === RELATIONS ===
