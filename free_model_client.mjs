@@ -3,10 +3,13 @@
  */
 
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 // Конфигурация для бесплатной модели
 const FREE_MODEL_CONFIG = {
-  apiKey: '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',
+  apiKey: process.env.OPENROUTER_API_KEY || 'your-api-key-here',
   apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
   model: 'arcee-ai/trinity-large-preview:free'
 };

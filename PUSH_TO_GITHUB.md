@@ -57,14 +57,14 @@ git remote -v
 
 ## ⚠️ Before Pushing
 
-Make sure `.env.secrets` is **NOT** committed:
+Make sure `.env` with API keys is **NOT** committed:
 
 ```bash
 # Check what will be committed
 git status
 
-# .env.secrets should NOT appear in the list
-# It's excluded by .gitignore
+# .env should NOT appear in the list
+# It should be excluded by .gitignore
 ```
 
 ## ✅ What's Ready
@@ -72,7 +72,6 @@ git status
 - [x] Code committed
 - [x] README.md updated
 - [x] TEAM_SETUP.md created
-- [x] .env.secrets.example created
 - [x] .gitignore updated
 - [x] Python integration (embeddings)
 - [x] Test data script (seed_data.py)

@@ -21,14 +21,7 @@ pip install -r requirements.txt
 
 ### 3. Setup Environment Variables
 
-Create `.env.secrets` file in the root directory:
-
-```bash
-# Copy from example
-cp .env.secrets.example .env.secrets
-```
-
-Edit `.env.secrets` with your API keys:
+Create `.env` file in the root directory with your API keys:
 
 ```
 OPENROUTER_API_KEY=your_openrouter_api_key
@@ -85,14 +78,18 @@ Multi-Modal-Agent/
 ├── shared/          # Shared types and schemas
 ├── embedding.py     # Hugging Face embeddings
 ├── supabase_client.py  # Supabase client
-├── .env             # Public config (Supabase URL)
-├── .env.secrets     # API keys (DO NOT COMMIT)
+├── .env             # Environment variables (API keys - DO NOT COMMIT)
 └── requirements.txt # Python dependencies
 ```
 
 ---
 
-## Available Scripts
+## Security Notes
+
+- ⚠️ **NEVER** commit `.env` with API keys to Git
+- ✅ Add `.env` to `.gitignore`
+- ✅ Rotate API keys if accidentally exposed
+- ✅ Use separate Supabase projects for dev/staging/production
 
 | Command | Description |
 |---------|-------------|
@@ -129,12 +126,3 @@ Add your team members as collaborators on GitHub:
 1. Go to Repository Settings → Collaborators
 2. Click "Add people"
 3. Enter GitHub username
-
----
-
-## Security Notes
-
-- ⚠️ **NEVER** commit `.env.secrets` to Git
-- ✅ `.env.secrets` is in `.gitignore`
-- ✅ Rotate API keys if accidentally exposed
-- ✅ Use separate Supabase projects for dev/staging/production

@@ -25,7 +25,7 @@ pip install -r requirements.txt
 
 ### 2. Настройка переменных окружения
 
-Создайте `.env.secrets` (см. `.env.secrets.example`):
+Создайте `.env` файл с вашими ключами:
 
 ```
 OPENROUTER_API_KEY=sk-or-v1-your_key
@@ -64,7 +64,6 @@ npm run dev
 | Файл | Описание |
 |------|----------|
 | [TEAM_SETUP.md](./TEAM_SETUP.md) | Полная инструкция для команды |
-| [.env.secrets.example](./.env.secrets.example) | Шаблон переменных окружения |
 
 ## Структура
 

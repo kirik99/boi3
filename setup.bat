@@ -24,11 +24,11 @@ npm install better-sqlite3
 npm install --save-dev @types/better-sqlite3
 
 # Проверяем наличие .env файла
-if [ ! -f .env ]; then
-    echo "⚠️  Файл .env не найден. Создаем шаблон..."
-    echo "OPENROUTER_API_KEY=ваш_api_ключ_здесь" > .env
-    echo "   ⚠️  Пожалуйста, замените 'ваш_api_ключ_здесь' на ваш реальный API-ключ в файле .env"
-fi
+if not exist .env (
+    echo ⚠️  Файл .env не найден. Создаем шаблон...
+    echo OPENROUTER_API_KEY=your_api_key_here > .env
+    echo    ⚠️  Please replace 'your_api_key_here' with your actual API key in .env file
+)
 
 echo "✅ Зависимости установлены"
 

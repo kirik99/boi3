@@ -2,8 +2,11 @@
  * Простой скрипт для отправки запросов в LLM через OpenRouter API
  */
 import fetch from 'node-fetch';
+import dotenv from 'dotenv';
 
-const API_KEY = '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';
+dotenv.config();
+
+const API_KEY = process.env.OPENROUTER_API_KEY || 'your-api-key-here';
 const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 async function sendRequest(userMessage, imageUrl = null) {

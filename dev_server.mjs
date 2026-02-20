@@ -17,7 +17,7 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 5000;
 
 // API конфигурация
-const OPENROUTER_API_KEY = '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';
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || 'your-api-key-here';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Express для API
