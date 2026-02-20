@@ -89,7 +89,7 @@ export async function registerRoutes(
 
       // 2. Prepare context for OpenRouter
       const history = await storage.getMessages(conversationId);
-      
+
       const apiMessages = history.map((msg) => {
         if (msg.role === "user" && msg.imageUrl) {
           return {
@@ -99,8 +99,8 @@ export async function registerRoutes(
               {
                 type: "image_url",
                 image_url: {
-                  url: msg.imageUrl.startsWith("http") 
-                    ? msg.imageUrl 
+                  url: msg.imageUrl.startsWith("http")
+                    ? msg.imageUrl
                     : `data:image/jpeg;base64,${fs.readFileSync(path.join(process.cwd(), "client", "public", msg.imageUrl)).toString("base64")}`
                 },
               },
@@ -116,21 +116,21 @@ export async function registerRoutes(
 
       const systemMessage = {
         role: "system",
-        content: `You are a multimodal AI agent. 
-Tasks:
-1. Analyze text and images.
-2. If image present, describe it or answer questions about it.
-3. If text only, answer text.
-4. Output structured, helpful responses.
-Format:
-Answer: <clear explanation>
-If image analyzed:
-Found on image:
+        content: `You are a multimodal AI agent. Follow this exact format for all responses:
+
+Answer:
+<clear explanation of the result>
+
+If image analysis was performed:
+What was found on the image:
 - ...
+
 Agent actions:
-- received request
-- analyzed input
-- generated response`,
+- sent request to API
+- received response
+- formed final result
+
+Always follow this structure precisely.`,
       };
 
       // Set headers for SSE
@@ -148,7 +148,7 @@ Agent actions:
           "X-Title": "Replit Multi-modal Agent", // Optional
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o", // Or any other model supported by OpenRouter
+          model: "arcee-ai/trinity-large-preview:free", // Free model
           messages: [systemMessage, ...apiMessages],
           stream: true,
         }),
@@ -156,7 +156,16 @@ Agent actions:
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(`OpenRouter Error: ${error}`);
+        // Check if it's an API limit error
+        if (response.status === 429) {
+          throw new Error(`API rate limit exceeded. Please try again later.`);
+        } else if (response.status === 401) {
+          throw new Error(`Invalid API key. Please check your OpenRouter API key configuration.`);
+        } else if (response.status === 402) {
+          throw new Error(`Payment required. Your OpenRouter account may have exceeded usage limits.`);
+        } else {
+          throw new Error(`OpenRouter Error: ${response.status} - ${error}`);
+        }
       }
 
       const reader = response.body?.getReader();
@@ -175,7 +184,7 @@ Agent actions:
             if (line.startsWith("data: ")) {
               const dataStr = line.slice(6).trim();
               if (dataStr === "[DONE]") continue;
-              
+
               try {
                 const data = JSON.parse(dataStr);
                 const content = data.choices[0]?.delta?.content || "";
@@ -203,11 +212,44 @@ Agent actions:
 
     } catch (error: any) {
       console.error("Agent Error:", error);
-      if (!res.headersSent) {
-        res.status(500).json({ message: error.message || "Internal Server Error" });
+      
+      // Handle specific API limit errors
+      if (error.message.includes('rate limit') || error.message.includes('exceeded usage')) {
+        const errorMessage = {
+          role: "assistant",
+          content: `Answer:
+I apologize, but I've reached my API usage limits. Please check your OpenRouter account for available quota or try again later.
+
+Agent actions:
+- attempted to send request to API
+- encountered API limit error
+- formed final result with error information`
+        };
+        
+        // Save the error message to the conversation
+        try {
+          await storage.createMessage({
+            conversationId: parseInt(req.params.id),
+            role: "assistant",
+            content: errorMessage.content,
+          });
+        } catch (storageError) {
+          console.error("Failed to save error message to storage:", storageError);
+        }
+        
+        if (!res.headersSent) {
+          res.status(200).json({ message: error.message });
+        } else {
+          res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+          res.end();
+        }
       } else {
-        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-        res.end();
+        if (!res.headersSent) {
+          res.status(500).json({ message: error.message || "Internal Server Error" });
+        } else {
+          res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+          res.end();
+        }
       }
     }
   });

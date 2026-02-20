@@ -1,35 +1,24 @@
-import requests
-import os
-from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
 
-# Загружаем основные переменные и секреты
-load_dotenv()
-load_dotenv(".env.secrets")
+# Локальная модель для эмбеддингов
+_model = None
 
-HF_TOKEN = os.getenv("HF_TOKEN")
-
-# Модель для эмбеддингов через HF Inference API
-HF_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+def get_model() -> SentenceTransformer:
+    """Ленивая загрузка модели."""
+    global _model
+    if _model is None:
+        print("Loading model: all-MiniLM-L6-v2...")
+        _model = SentenceTransformer('all-MiniLM-L6-v2')
+    return _model
 
 def get_embedding(text: str) -> list[float]:
-    """Получить эмбеддинг текста через Hugging Face Inference API."""
-    
-    url = f"https://router.huggingface.co/hf-inference/models/{HF_EMBEDDING_MODEL}"
-    
-    headers = {
-        "Authorization": f"Bearer {HF_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "inputs": text
-    }
-    
-    res = requests.post(url, headers=headers, json=data)
-    res.raise_for_status()
-    
-    return res.json()
+    """Получить эмбеддинг текста локально."""
+    model = get_model()
+    embedding = model.encode(text, convert_to_numpy=True)
+    return embedding.tolist()
 
 def get_embeddings(texts: list[str]) -> list[list[float]]:
     """Получить эмбеддинги для списка текстов."""
-    return [get_embedding(text) for text in texts]
+    model = get_model()
+    embeddings = model.encode(texts, convert_to_numpy=True)
+    return embeddings.tolist()

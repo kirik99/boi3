@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест AI Агента</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        h1 { color: #00d9ff; }
+        #messages {
+            background: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 200px;
+            margin-bottom: 20px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .user { background: #0f3460; border-left: 4px solid #00d9ff; }
+        .assistant { background: #0f3460; border-left: 4px solid #e94560; }
+        #input {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 5px;
+            background: #16213e;
+            color: #eee;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 15px 30px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #ff6b6b; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        .loading { color: #00d9ff; }
+        .error { color: #ff6b6b; }
+    </style>
+</head>
+<body>
+    <h1>🤖 Тест AI Агента</h1>
+    
+    <div id="messages"></div>
+    
+    <input type="text" id="input" placeholder="Введите сообщение..." onkeypress="if(event.key==='Enter')sendMessage()">
+    <button onclick="sendMessage()" id="sendBtn">Отправить</button>
+    
+    <script>
+        let conversationId = null;
+        
+        async function createConversation() {
+            const res = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: 'Test Chat' })
+            });
+            const data = await res.json();
+            conversationId = data.id;
+            return data.id;
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('input');
+            const sendBtn = document.getElementById('sendBtn');
+            const messagesDiv = document.getElementById('messages');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Создаем беседу, если ещё не создана
+            if (!conversationId) {
+                conversationId = await createConversation();
+            }
+            
+            // Добавляем сообщение пользователя
+            messagesDiv.innerHTML += `
+                <div class="message user">
+                    <strong>Вы:</strong><br>${message}
+                </div>
+            `;
+            
+            input.value = '';
+            sendBtn.disabled = true;
+            sendBtn.textContent = 'Думаю...';
+            
+            // Отправляем сообщение
+            try {
+                const res = await fetch(`/api/conversations/${conversationId}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: message })
+                });
+                
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.message || 'Ошибка сервера');
+                }
+                
+                const data = await res.json();
+                
+                // Добавляем ответ ассистента
+                messagesDiv.innerHTML += `
+                    <div class="message assistant">
+                        <strong>AI:</strong><br>${formatResponse(data.content)}
+                    </div>
+                `;
+            } catch (error) {
+                messagesDiv.innerHTML += `
+                    <div class="message error">
+                        ❌ Ошибка: ${error.message}
+                    </div>
+                `;
+            }
+            
+            sendBtn.disabled = false;
+            sendBtn.textContent = 'Отправить';
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function formatResponse(text) {
+            return text
+                .replace(/Answer:/g, '<strong>Ответ:</strong>')
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        }
+        
+        // Приветственное сообщение
+        document.getElementById('messages').innerHTML = `
+            <div class="message assistant">
+                <strong>AI:</strong><br>Привет! Я ваш AI-агент. Задайте мне любой вопрос!
+            </div>
+        `;
+    </script>
+</body>
+</html>
