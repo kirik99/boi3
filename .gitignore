@@ -10,3 +10,7 @@ vite.config.ts.*
 __pycache__/
 *.db
 sqlite.db
+.local/
+.replit
+dev_server.mjs
+setup.bat
