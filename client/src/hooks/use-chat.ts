@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Conversation, Message } from "@shared/models/chat";
+import type { Conversation, Message } from "@shared/schema";
 
 // Using the routes provided by the Replit AI integration
 const API_BASE = "/api";
@@ -78,7 +78,7 @@ export function useChatStream(conversationId: number | null) {
 
     setIsStreaming(true);
     setStreamedContent("");
-    
+
     // Optimistically update UI could happen here, but we'll rely on the parent component
     // to show the user's message immediately.
 
@@ -135,8 +135,8 @@ export function useChatStream(conversationId: number | null) {
       setIsStreaming(false);
       setStreamedContent("");
       // Invalidate query to fetch the full saved message from DB
-      queryClient.invalidateQueries({ 
-        queryKey: [`${API_BASE}/conversations`, conversationId] 
+      queryClient.invalidateQueries({
+        queryKey: [`${API_BASE}/conversations`, conversationId]
       });
     }
   }, [conversationId, queryClient]);

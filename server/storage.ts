@@ -1,14 +1,13 @@
-
 import { conversations, messages, type Message, type InsertMessage, type Conversation, type InsertConversation } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, asc } from "drizzle-orm";
 
 export interface IStorage {
   getConversations(): Promise<Conversation[]>;
   getConversation(id: number): Promise<Conversation | undefined>;
   createConversation(title: string): Promise<Conversation>;
   deleteConversation(id: number): Promise<void>;
-  
+
   getMessages(conversationId: number): Promise<Message[]>;
   createMessage(insertMessage: InsertMessage): Promise<Message>;
 }
@@ -34,7 +33,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMessages(conversationId: number): Promise<Message[]> {
-    return await db.select().from(messages).where(eq(messages.conversationId, conversationId)).orderBy(messages.createdAt);
+    return await db.select().from(messages).where(eq(messages.conversationId, conversationId)).orderBy(asc(messages.createdAt));
   }
 
   async createMessage(insertMessage: InsertMessage): Promise<Message> {

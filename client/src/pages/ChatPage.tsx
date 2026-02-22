@@ -4,12 +4,12 @@ import { Menu, Bot } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
-import { 
-  useConversations, 
-  useConversation, 
-  useCreateConversation, 
+import {
+  useConversations,
+  useConversation,
+  useCreateConversation,
   useDeleteConversation,
-  useChatStream 
+  useChatStream
 } from "@/hooks/use-chat";
 
 export default function ChatPage() {
@@ -17,7 +17,7 @@ export default function ChatPage() {
   const conversationId = match && params?.id ? parseInt(params.id) : null;
   const [location, setLocation] = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  
+
   // Queries & Mutations
   const { data: conversations = [], isLoading: isLoadingConvs } = useConversations();
   const { data: conversationData, isLoading: isLoadingMessages } = useConversation(conversationId);
@@ -51,20 +51,25 @@ export default function ChatPage() {
     });
   };
 
+  const [pendingMessage, setPendingMessage] = useState<{ content: string, imageUrl?: string } | null>(null);
+
+  // Auto-send pending message when chat ID becomes available
+  useEffect(() => {
+    if (conversationId && pendingMessage) {
+      sendMessage(pendingMessage.content, pendingMessage.imageUrl);
+      setPendingMessage(null);
+    }
+  }, [conversationId, pendingMessage, sendMessage]);
+
   const handleSend = (content: string, imageUrl?: string) => {
     if (conversationId) {
       sendMessage(content, imageUrl);
     } else {
       // Create chat first if sending from home
+      setPendingMessage({ content, imageUrl });
       createConversation.mutate(content.slice(0, 30) + "...", {
         onSuccess: (newConv) => {
           setLocation(`/chat/${newConv.id}`);
-          // We need to wait for the location update to propagate and useChatStream to re-initialize with new ID
-          // But actually, we can't easily call sendMessage from here because useChatStream is bound to null initially.
-          // A better approach would be to have a global context or pass the ID to sendMessage if useChatStream supported it.
-          // For this lite build, we'll just let the user know they can now chat.
-          // Or we can try to send it after a delay, but that's flaky.
-          // Let's just create the chat.
         }
       });
     }
@@ -72,7 +77,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background text-foreground font-sans">
-      <Sidebar 
+      <Sidebar
         conversations={conversations}
         activeId={conversationId}
         onCreate={handleCreateChat}
@@ -84,7 +89,7 @@ export default function ChatPage() {
       <main className="flex-1 flex flex-col relative w-full h-full min-w-0">
         {/* Mobile Header */}
         <div className="md:hidden flex items-center p-4 border-b border-white/5 bg-background/80 backdrop-blur-md z-10 sticky top-0">
-          <button 
+          <button
             onClick={() => setIsMobileOpen(true)}
             className="p-2 -ml-2 rounded-lg hover:bg-white/10 text-muted-foreground"
           >
@@ -109,7 +114,7 @@ export default function ChatPage() {
               <p className="text-xl text-muted-foreground max-w-lg mb-10">
                 I'm Nexus, your advanced AI assistant. I can help you with coding, writing, analysis, and more.
               </p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full">
                 {["Explain quantum computing", "Write a Python script", "Draft a professional email", "Analyze this data"].map((prompt) => (
                   <button
@@ -134,22 +139,22 @@ export default function ChatPage() {
               ) : (
                 <>
                   {conversationData?.messages.map((msg) => (
-                    <ChatMessage 
-                      key={msg.id} 
-                      role={msg.role as "user" | "assistant"} 
-                      content={msg.content} 
+                    <ChatMessage
+                      key={msg.id}
+                      role={msg.role as "user" | "assistant"}
+                      content={msg.content}
                       imageUrl={msg.imageUrl}
                     />
                   ))}
-                  
+
                   {isStreaming && (
-                    <ChatMessage 
-                      role="assistant" 
-                      content={streamedContent} 
+                    <ChatMessage
+                      role="assistant"
+                      content={streamedContent}
                       isStreaming={true}
                     />
                   )}
-                  
+
                   <div ref={scrollRef} className="h-px" />
                 </>
               )}

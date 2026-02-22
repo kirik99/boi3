@@ -31,11 +31,11 @@ export async function setupVite(server: Server, app: Express) {
 
   app.use(vite.middlewares);
 
-  // Serve static files from client directory (e.g., test.html)
-  app.use(express.static(path.resolve(import.meta.dirname, "..", "client")));
-
-  app.use("/{*path}", async (req, res, next) => {
+  app.use(async (req, res, next) => {
     const url = req.originalUrl;
+    if (url.startsWith("/api")) {
+      return next();
+    }
 
     try {
       const clientTemplate = path.resolve(
@@ -45,12 +45,7 @@ export async function setupVite(server: Server, app: Express) {
         "index.html",
       );
 
-      // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
-      );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {

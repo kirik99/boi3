@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Plus, MessageSquare, Trash2, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Conversation } from "@shared/models/chat";
+import type { Conversation } from "@shared/schema";
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -12,10 +12,10 @@ interface SidebarProps {
   setIsMobileOpen: (open: boolean) => void;
 }
 
-export function Sidebar({ 
-  conversations, 
-  activeId, 
-  onCreate, 
+export function Sidebar({
+  conversations,
+  activeId,
+  onCreate,
   onDelete,
   isMobileOpen,
   setIsMobileOpen
@@ -26,7 +26,7 @@ export function Sidebar({
     <>
       {/* Mobile Overlay */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
           onClick={() => setIsMobileOpen(false)}
         />
@@ -85,17 +85,17 @@ export function Sidebar({
                     // Actually, let's use the Link component to be safe with wouter
                   }}
                 >
-                  <Link 
+                  <Link
                     href={`/chat/${conv.id}`}
                     className="absolute inset-0 z-0"
                     onClick={() => setIsMobileOpen(false)}
                   />
-                  
+
                   <MessageSquare className={cn(
                     "w-4 h-4 z-10",
                     activeId === conv.id ? "text-secondary" : "text-muted-foreground group-hover:text-secondary/70"
                   )} />
-                  
+
                   <span className="truncate text-sm font-medium flex-1 z-10 relative">
                     {conv.title}
                   </span>
