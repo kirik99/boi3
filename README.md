@@ -1,89 +1,66 @@
-# Мультимодальный AI-агент
+# Laboratory AI Assistant (MML Agent)
 
-AI-агент с поддержкой текста, изображений и векторного поиска по базе знаний.
+AI-ассистент для лаборатории с поддержкой текста, изображений и интеллектуального поиска по базе знаний (RAG).
 
 ## Особенности
 
-- 📝 **Текст и изображения** — мультимодальные запросы
-- 🧠 **LLM через OpenRouter** — `arcee-ai/trinity-large-preview:free` (бесплатно)
-- 🔍 **Векторный поиск** — RAG через Supabase + Hugging Face embeddings
-- 💾 **База знаний** — документы лабораторных методик и протоколов
-- 📡 **Streaming** — потоковая передача ответов
-- 🛡️ **Обработка ошибок** — graceful fallbacks
+- 🔬 **Специализация** — настроен на работу с лабораторными протоколами и методиками.
+- 🔍 **Умный RAG** — поиск информации напрямую в вашей базе Supabase (таблицы `documents` и `document_chunks`).
+- 🤖 **Модель Gemma 3** — использует современную модель `google/gemma-3-12b-it:free` через OpenRouter.
+- 💾 **Гибридное хранение** — история чатов хранится локально в `sqlite.db` для максимальной стабильности, а база знаний — в облаке Supabase.
+- 🖼️ **Мультимодальность** — возможность прикреплять изображения к запросам.
 
 ## Быстрый старт
 
 ### 1. Установка зависимостей
 
-```bash
-# Node.js
+```powershell
+# Node.js зависимости
 npm install
 
-# Python (для эмбеддингов)
+# Python зависимости (для работы сервера эмбеддингов)
 pip install -r requirements.txt
 ```
 
-### 2. Настройка переменных окружения
+### 2. Настройка окружения (.env)
 
-Создайте `.env` файл с вашими ключами:
+Создайте файл `.env` в корне проекта:
 
-```
-OPENROUTER_API_KEY=sk-or-v1-your_key
-SUPABASE_KEY=your_supabase_key
-HF_TOKEN=hf_your_token
-```
-
-### 3. Настройка Supabase (векторный поиск)
-
-В Supabase SQL Editor выполните:
-
-```sql
-create extension if not exists vector;
-alter table documents add column if not exists embedding vector(384);
-create index documents_embedding_idx on documents using ivfflat (embedding vector_cosine_ops);
+```env
+OPENROUTER_API_KEY=ваш_ключ
+SUPABASE_URL=ваша_ссылка_supabase
+SUPABASE_KEY=ваш_ключ_supabase
+HF_TOKEN=ваш_токен_huggingface
 ```
 
-### 4. Тестовые данные (опционально)
+### 3. Подготовка базы знаний
 
-```bash
-python seed_data.py
-```
+1.  **Создание функции поиска**: Выполните SQL-запрос из файла `supabase_setup.sql` (или из инструкций в чате) в Supabase SQL Editor для настройки функции `match_chunks` под размер вектора 384.
+2.  **Индексация документов**:
+    Запустите сервер эмбеддингов в одном терминале:
+    ```powershell
+    python embedding_server.py
+    ```
+    Запустите скрипт индексации во втором терминале:
+    ```powershell
+    python rebuild_knowledge_base.py
+    ```
 
-### 5. Запуск
+### 4. Запуск приложения
 
-```bash
+```powershell
 npm run dev
 ```
+Приложение будет доступно по адресу: http://localhost:5000
 
-Приложение: http://localhost:5000
+## Структура проекта
 
----
-
-## Документация
-
-| Файл | Описание |
-|------|----------|
-| [TEAM_SETUP.md](./TEAM_SETUP.md) | Полная инструкция для команды |
-
-## Структура
-
-```
-├── client/           # React + Vite frontend
-├── server/           # Node.js backend
-├── shared/           # Общие типы и схемы
-├── embedding.py      # Hugging Face embeddings API
-├── supabase_client.py # Supabase клиент
-├── seed_data.py      # Скрипт заполнения БД
-└── requirements.txt  # Python зависимости
-```
-
-## API Ключи
-
-| Сервис | Получение | Стоимость |
-|--------|-----------|-----------|
-| OpenRouter | https://openrouter.ai/keys | $0 (free model) |
-| Hugging Face | https://huggingface.co/tokens | $0.10/мес бесплатно |
-| Supabase | Project Settings → API | Free tier |
+- `client/` — Фронтенд на React + Vite.
+- `server/` — Бэкенд на Node.js (Express).
+- `shared/` — Общие схемы данных.
+- `rebuild_knowledge_base.py` — Скрипт для обновления базы знаний.
+- `embedding_server.py` — Локальный сервер для генерации векторов (384 dim).
+- `sqlite.db` — Локальная база истории чатов.
 
 ## Лицензия
 
