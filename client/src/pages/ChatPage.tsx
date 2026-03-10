@@ -86,7 +86,7 @@ export default function ChatPage() {
         setIsMobileOpen={setIsMobileOpen}
       />
 
-      <main className="flex-1 flex flex-col relative w-full h-full min-w-0">
+      <main className="flex-1 flex flex-col w-full h-full min-w-0 bg-background/50">
         {/* Mobile Header */}
         <div className="md:hidden flex items-center p-4 border-b border-white/5 bg-background/80 backdrop-blur-md z-10 sticky top-0">
           <button
@@ -131,7 +131,7 @@ export default function ChatPage() {
             </div>
           ) : (
             // Messages List
-            <div className="flex flex-col gap-6 p-4 md:p-8 pb-32 min-h-full">
+            <div className="flex flex-col gap-6 p-4 md:p-8 min-h-full">
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
@@ -163,7 +163,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input Area */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10 px-4">
+        <div className="bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10 px-4 border-t border-white/5">
           <ChatInput onSend={handleSend} isLoading={isStreaming} />
         </div>
       </main>

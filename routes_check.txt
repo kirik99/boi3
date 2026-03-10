@@ -5,7 +5,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import express from "express";
-import { ragSearch, listDocuments, listChunks, searchChunks } from "./rag";
+import { ragSearch, listDocuments, listChunks, searchChunks, fetchInternetInfo } from "./rag";
 import { 
   hasInstrumentMention, 
   extractInstrumentNames, 
@@ -19,10 +19,6 @@ import {
 // Configure DeepSeek
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY?.trim();
 const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
-
-// Configure Supabase
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://inlnzpjewdyovotnidsy.supabase.co";
-const SUPABASE_KEY = process.env.SUPABASE_KEY || "sb_publishable_SvR40SEMeUYzgOc_D8vlcA_fc8ocp23";
 
 if (DEEPSEEK_API_KEY) {
   console.log(`[DeepSeek] API Key loaded (length: ${DEEPSEEK_API_KEY.length})`);
@@ -107,19 +103,32 @@ export async function registerRoutes(
         return res.status(500).json({ message: "DEEPSEEK_API_KEY is not configured" });
       }
 
-      // === RULE 1: Check if instrument is mentioned (RELAXED) ===
-      // Even if instrument is not mentioned, we proceed to RAG to see if we can find something.
-      // We only log it for now.
+      // === RULE 1: Check if instrument is mentioned ===
       if (!hasInstrumentMention(content)) {
-        console.log(`[Prompt Rules] No explicit instrument mentioned, proceeding to general RAG.`);
+        await storage.createMessage({
+          conversationId,
+          role: "user",
+          content,
+          imageUrl,
+        });
+        
+        const clarificationResponse = buildClarificationPrompt();
+        await storage.createMessage({
+          conversationId,
+          role: "assistant",
+          content: clarificationResponse,
+        });
+        
+        console.log(`[Prompt Rules] No instrument mentioned - sent clarification`);
+        res.json({ content: clarificationResponse });
+        return;
       }
 
       // === Extract instrument names (normalizes test-machine variants) ===
       const instruments = extractInstrumentNames(content);
       
-      // === RULE 7: If multiple models detected - ask for clarification (RELAXED) ===
-      // Only ask if it's very ambiguous, otherwise proceed.
-      if (hasMultipleModels(instruments) && instruments.length > 3) {
+      // === RULE 7: If multiple models detected - ask for clarification ===
+      if (hasMultipleModels(instruments)) {
         await storage.createMessage({
           conversationId,
           role: "user",
@@ -134,7 +143,7 @@ export async function registerRoutes(
           content: modelClarificationResponse,
         });
         
-        console.log(`[Prompt Rules] Too many models detected: ${instruments.join(', ')}`);
+        console.log(`[Prompt Rules] Multiple models detected: ${instruments.join(', ')}`);
         res.json({ content: modelClarificationResponse });
         return;
       }
@@ -174,88 +183,73 @@ export async function registerRoutes(
         }
       });
 
-      // 3. RAG: Search for relevant context using the unified Python RAG service
+      // 3. RAG: Search for relevant context from Supabase
       let context = "";
       let foundInDatabase = false;
       let fromInternet = false;
       
       try {
-        const ragResponse = await searchChunks(content) as { results: any[], source: string };
-        if (ragResponse && ragResponse.results.length > 0) {
-          const results = ragResponse.results;
-          foundInDatabase = ragResponse.source === "database" || ragResponse.source === "lab_methods" || ragResponse.source === "knowledge_base" || ragResponse.source === "mixed";
-          fromInternet = ragResponse.source === "internet" || ragResponse.source === "mixed";
-          
-          context = "\n\nRelevant information from our " + (fromInternet ? "sources (including internet)" : "laboratory database") + ":\n" + 
-            results.map((r: any) => `[Source: ${r.source}] ${r.content}`).join("\n\n---\n\n");
+        const results = await searchChunks(content);
+        if (results && results.length > 0) {
+          foundInDatabase = true;
+          context = "\n\nRelevant information from knowledge base:\n" +
+            results.map((r: any) => `- ${r.content}`).join("\n");
         }
       } catch (error) {
         console.error("RAG search failed:", error);
       }
-      // === RULE 3: Build answer with strict structure only if methodology requested ===
-      const instrumentName = instruments.length > 0 ? instruments[0] : "Не указан";
-      const isMethodologyRequest = ['методика', 'инструкция', 'калибровка', 'как работать', 'измерение', 'method', 'instruction', 'calibration'].some(word => content.toLowerCase().includes(word));
-      
-      let formattedResponse = "";
-      
-      if (instrumentName !== "Не указан" || isMethodologyRequest) {
-          // Extract sections from context
-          const calibrationMatch = context.match(/(?:Калибровка[^:]*:|Calibration[^:]*:|Приготовление\s+\w+[^.\n]*\.)([\s\S]*?)(?:Измерение|Методика|Measurement|Methodology|Образец|$)/i);
-          const methodologyMatch = context.match(/(?:Измерение\s+\w*[^.\n]*[:\.]?|Методика[^:]*:|Measurement[^:]*:|Methodology[^:]*:)([\s\S]*?)(?:Прибор|Калибровка|Calibration|Приготовление|$)/i);
-          
-          const calibration = calibrationMatch ? calibrationMatch[1].trim() : null;
-          const methodology = methodologyMatch ? methodologyMatch[1].trim() : null;
 
-          // Build strict formatted response
-          let finalCalibration = calibration;
-          let finalMethodology = methodology;
-          
-          if (!calibration && !methodology && context) {
-            const parts = context.split('---');
-            if (parts.length > 0) {
-              finalCalibration = parts[0].trim().substring(0, 500);
-              finalMethodology = parts.length > 1 ? parts.slice(1).join('\n\n').trim() : parts[0].trim().substring(500);
-            }
+      // === RULE 5: If database returns no results - perform internet search ===
+      if (!foundInDatabase) {
+        try {
+          const internetInfo = await fetchInternetInfo(content);
+          if (internetInfo) {
+            fromInternet = true;
+            context = "\n\nInformation from external sources:\n" + internetInfo;
           }
-          
-          formattedResponse = buildInstrumentResponse(
-            instrumentName,
-            finalCalibration,
-            finalMethodology,
-            fromInternet,
-            !foundInDatabase && !fromInternet
-          );
-      } else {
-          // For general questions, provide a more natural conversational context
-          formattedResponse = "Вы — универсальный лабораторный помощник. Используйте предоставленные данные для ответа на общий вопрос пользователя.";
+        } catch (error) {
+          console.error("Internet search failed:", error);
+        }
       }
+
+      // === RULE 3: Build answer with strict structure ===
+      const instrumentName = instruments.length > 0 ? instruments[0] : "Не указан";
+      
+      // Extract calibration and methodology sections from context
+      const calibrationMatch = context.match(/(?:Калибровка|Calibration)[:\s]*([\s\S]*?)(?:Методика|Measurement|Methodology|$)/i);
+      const methodologyMatch = context.match(/(?:Методика|Measurement|Methodology)[:\s]*([\s\S]*?)(?:Прибор|Калибровка|$)/i);
+      
+      const calibration = calibrationMatch ? calibrationMatch[1].trim() : null;
+      const methodology = methodologyMatch ? methodologyMatch[1].trim() : null;
+
+      // Build strict formatted response
+      const formattedResponse = buildInstrumentResponse(
+        instrumentName,
+        calibration,
+        methodology,
+        fromInternet,
+        !foundInDatabase && !fromInternet
+      );
 
       let systemContent = `Вы — профессиональный лабораторный ассистент. Отвечайте ВСЕГДА на русском языке.\n\n`;
       
-      // === RULE 4: Explicit Source Labeling ===
+      // === RULE 4: Mark if information comes from internet ===
       if (fromInternet) {
-        if (foundInDatabase) {
-            systemContent += `⚠️ ВНИМАНИЕ: Для части вашего вопроса информация в локальной базе не найдена, поэтому я дополнительно поискал в интернете.\n\n`;
-        } else {
-            systemContent += `⚠️ ВНИМАНИЕ: Информация не найдена в нашей базе приборов. Я нашел следующие данные в открытых источниках (интернет):\n\n`;
-        }
-      } else if (foundInDatabase) {
-        systemContent += `✅ Информация получена из официальной базы данных нашей лаборатории.\n\n`;
+        systemContent += `⚠️ Информация получена из внешних источников.\n\n`;
       }
       
       systemContent += formattedResponse;
 
-      // === RULE 6: Source Transparency ===
-      if (context) {
-        systemContent += `\n\n[ДАННЫЕ ИЗ БАЗЫ/ИНТЕРНЕТА ДЛЯ АНАЛИЗА]:\n${context}`;
+      // === RULE 6: Never fabricate data ===
+      if (!calibration && !methodology && !fromInternet) {
+        systemContent += `\n⚠️ Данная информация отсутствует в базе знаний. Пожалуйста, обратитесь к документации прибора.\n`;
       }
 
-      // Explicit instruction to LLM about source mentioning
-      systemContent += `\n\nПри ответе обязательно укажи, если информация взята из интернета. Если информация взята из нашей базы, отвечай уверенно как ассистент нашей лаборатории.`;
+      systemContent += `\n\n${context}`;
 
       console.log(`[Chat] Instrument: ${instrumentName}`);
       console.log(`[Chat] Found in Database: ${foundInDatabase}`);
-      // fromInternet logging removed
+      console.log(`[Chat] From Internet: ${fromInternet}`);
       console.log(`[Chat] Russian query: ${isRussian(content)}`);
 
       const model = "deepseek-chat";

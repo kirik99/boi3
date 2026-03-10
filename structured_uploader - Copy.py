@@ -19,8 +19,6 @@ load_dotenv()
 # Force UTF-8 for console output to handle Russian characters correctly
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-print("=== Structured Uploader Script Started ===", flush=True)
-
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 HF_TOKEN = os.getenv("HF_TOKEN")
@@ -32,29 +30,22 @@ hf_client = InferenceClient(token=HF_TOKEN)
 def get_embedding(text):
     """Get vector embedding via HF API"""
     model_id = "intfloat/multilingual-e5-large"
-    # Truncate text strictly to avoid overloading (E5-large limit is around 512 tokens)
-    # 3000 chars is a safe estimate for ~500-700 tokens
-    safe_text = text[:3000] 
-    
     try:
-        embedding = hf_client.feature_extraction(f"passage: {safe_text}", model=model_id)
+        embedding = hf_client.feature_extraction(f"passage: {text}", model=model_id)
         if hasattr(embedding, "tolist"):
             embedding = embedding.tolist()
         if isinstance(embedding, list) and len(embedding) > 0 and isinstance(embedding[0], list):
             return embedding[0]
         return embedding
     except Exception as e:
-        err_msg = str(e).lower()
-        # Retry on 503 (loading) or connection timeout (10060)
-        if "503" in err_msg or "loading" in err_msg or "10060" in err_msg or "timeout" in err_msg:
-            print(f"  Connection issue/Model loading ({e}), waiting 20s...")
+        if "503" in str(e):
+            print("  Model loading, waiting 20s...")
             time.sleep(20)
             return get_embedding(text)
         raise e
 
-def chunk_text(text, max_chars=18000, overlap=2500):
-    """Split text into overlapping chunks to fit LLM context limits.
-    Increased max_chars and overlap for better context retention in large manuals."""
+def chunk_text(text, max_chars=12000, overlap=1000):
+    """Split text into overlapping chunks to fit LLM context limits (~4000 tokens)"""
     if len(text) <= max_chars:
         return [text]
     
@@ -78,8 +69,7 @@ def parse_with_llm(text, context_info=""):
     
     Твоя задача — извлечь данные и вернуть их СТРОГО в формате JSON списка объектов.
     Если в тексте несколько методов/протоколов, извлеки каждый отдельно.
-    Если это инструкция к прибору (manual), выдели основные шаги настройки и эксплуатации как отдельные методы.
-    Если этот блок текста является продолжением предыдущего, постарайся сохранить целостность названий методов.
+    Если это инструкция к прибору (manual), выдели основные шаги настройки.
 
     Поля для каждого объекта:
     - "method_name": Название метода или раздела (обязательно)
@@ -92,8 +82,7 @@ def parse_with_llm(text, context_info=""):
     1. Пиши значения полей на РУССКОМ языке.
     2. Если какой-то раздел не найден, заполни поле пустым "".
     3. Верни ТОЛЬКО JSON список [ {{...}}, {{...}} ]. Без вступительных слов и пояснений.
-    4. Если полезной информации нет (например, только оглавление или общие слова), верни пустой список [].
-    5. Если метод описан частично, извлеки что есть.
+    4. Если полезной информации нет, верни пустой список [].
 
     Текст для анализа:
     {text}
@@ -108,52 +97,22 @@ def parse_with_llm(text, context_info=""):
         )
         content = response.choices[0].message.content.strip()
         
-        # Robust JSON extraction
-        json_str = ""
-        # 1. Try to find content inside code blocks
-        code_match = re.search(r"```(?:json)?\s*(.*?)```", content, re.DOTALL)
-        if code_match:
-            json_str = code_match.group(1).strip()
-        else:
-            # 2. Try to find the first '[' and last ']'
-            start_bracket = content.find('[')
-            end_bracket = content.rfind(']')
-            if start_bracket != -1 and end_bracket != -1 and end_bracket > start_bracket:
-                json_str = content[start_bracket:end_bracket+1]
-            else:
-                # 3. Fallback to first '{' and last '}'
-                start_brace = content.find('{')
-                end_brace = content.rfind('}')
-                if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
-                    json_str = content[start_brace:end_brace+1]
-        
-        if not json_str:
-            return []
+        # Clean response from markdown blocks if any
+        if "```json" in content:
+            content = re.search(r"```json\s*(.*?)\s*```", content, re.DOTALL).group(1)
+        elif "```" in content:
+            content = re.search(r"```\s*(.*?)\s*```", content, re.DOTALL).group(1)
 
-        try:
-            # Fix common tiny errors LLM might make
-            data = json.loads(json_str)
+        # Search for JSON array or object
+        json_match = re.search(r'\[\s*\{.*\}\s*\]|\{\s*".*"\s*:.*\}', content, re.DOTALL)
+        if json_match:
+            data = json.loads(json_match.group(0))
             return data if isinstance(data, list) else [data]
-        except json.JSONDecodeError as je:
-            print(f"  JSON Decode Error: {je}. Attempting aggressive cleaning...")
-            # Try to find all JSON-like objects in the string if it's a mess
-            try:
-                # If it's "Extra data", try to parse only until the error index
-                if "Extra data" in str(je):
-                    # je.pos is the start of the extra data
-                    data = json.loads(json_str[:je.pos])
-                    return data if isinstance(data, list) else [data]
-            except:
-                pass
-            
-            print(f"  --- RAW LLM RESPONSE START ---")
-            print(content)
-            print(f"  --- RAW LLM RESPONSE END ---")
-            return []
-                
+        
+        return []
     except Exception as e:
         print(f"  HF LLM Error: {e}")
-        if "503" in str(e).lower() or "loading" in str(e).lower():
+        if "503" in str(e):
             print("  Model is loading, waiting 30s...")
             time.sleep(30)
             return parse_with_llm(text, context_info)
@@ -182,7 +141,7 @@ def extract_text(file_path):
 def process_file(file_path, base_dir):
     file_rel_path = os.path.relpath(file_path, base_dir)
     file_name = os.path.basename(file_path)
-    print(f"\n[{time.strftime('%H:%M:%S')}] Processing {file_rel_path}...", flush=True)
+    print(f"\n[{time.strftime('%H:%M:%S')}] Processing {file_rel_path}...")
     
     raw_text = extract_text(file_path)
     if not raw_text or not raw_text.strip():
@@ -219,17 +178,12 @@ def process_file(file_path, base_dir):
 
     # Upload unique protocols
     for name, p in unique_methods.items():
-        # Build searchable string - prioritize key fields for embedding
-        # E5-large handles about 512 tokens. 
-        # We construct a summary that hits all important parts.
-        search_text = f"Название: {name}. "
-        if p.get('preparation'): search_text += f"Подготовка: {p['preparation'][:800]} "
-        if p.get('calibration'): search_text += f"Калибровка: {p['calibration'][:800]} "
-        if p.get('measurement'): search_text += f"Измерение: {p['measurement'][:1200]} "
-        if p.get('spectro_setup'): search_text += f"Настройка: {p['spectro_setup'][:800]} "
+        print(f"  Preparing vector for: {name}")
         
-        print(f"  Generating embedding for: {name} ({len(search_text)} chars)")
-        embedding = get_embedding(search_text)
+        # Build searchable string
+        full_content = f"{name}. {p.get('preparation','')} {p.get('calibration','')} {p.get('measurement','')} {p.get('spectro_setup','')}"
+        # Truncate content for embedding if extremely long
+        embedding = get_embedding(full_content[:15000])
         
         data = {
             "method_name": name,
@@ -265,7 +219,7 @@ def main():
             if file.lower().endswith((".pdf", ".docx", ".txt", ".md")):
                 files_to_process.append(os.path.join(root, file))
     
-    print(f"Found {len(files_to_process)} files to process in {target_dir}", flush=True)
+    print(f"Found {len(files_to_process)} files to process in {target_dir}")
     
     for file_path in files_to_process:
         process_file(file_path, target_dir)

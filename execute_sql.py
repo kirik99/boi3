@@ -1,25 +1,38 @@
+import os
+import psycopg2
+from dotenv import load_dotenv
+
 # Load environment variables
 load_dotenv()
+
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Extract project ref from URL if possible, or use env
-# postgresql://postgres.[REF]:[PASS]@...
-import re
-match = re.search(r"postgres\.([^:]+):([^@]+)@", DATABASE_URL)
-if match:
-    PROJECT_REF = match.group(1)
-    PASSWORD = match.group(2)
-else:
-    PROJECT_REF = os.getenv("SUPABASE_PROJECT_REF", "inlnzpjewdyovotnidsy")
-    PASSWORD = os.getenv("SUPABASE_DB_PASSWORD", "")
+def get_connection():
+    """Try various connection strings to handle Supabase pooler quirks"""
+    # 1. Try provided DATABASE_URL
+    if DATABASE_URL:
+        try:
+            return psycopg2.connect(DATABASE_URL)
+        except Exception as e:
+            print(f"Direct connection failed: {e}")
 
-# Explicit URL for Pooler in Transaction Mode (6543) with SSL
-URL = f"postgresql://postgres.{PROJECT_REF}:{PASSWORD}@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require"
+    # 2. Try to construct direct hostname (bypassing pooler if possible)
+    # The project ref is likely in the URL
+    project_ref = "inlnzpjewdyovotnidsy" 
+    password = "LG6ihuTHFr8vA550"
+    
+    direct_url = f"postgresql://postgres:{password}@db.{project_ref}.supabase.co:5432/postgres"
+    try:
+        print("Attempting direct connection to db.inlnzpjewdyovotnidsy.supabase.co...")
+        return psycopg2.connect(direct_url)
+    except Exception as e:
+        print(f"Direct construction failed: {e}")
+        raise e
 
 def execute_sql_file(file_path):
-    print(f"Executing {file_path} via Pooler 6543...")
+    print(f"Executing {file_path}...")
     try:
-        conn = psycopg2.connect(URL)
+        conn = get_connection()
         conn.autocommit = True
         cur = conn.cursor()
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -29,7 +42,7 @@ def execute_sql_file(file_path):
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"Final attempt failed: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     execute_sql_file("setup_db.sql")

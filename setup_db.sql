@@ -48,3 +48,43 @@ begin
   limit match_count;
 end;
 $$;
+
+-- 4. Create the table for raw document chunks
+create table if not exists knowledge_base (
+  id uuid primary key default gen_random_uuid(),
+  file_source text,
+  category text default 'General',
+  step_type text default 'Chunk',
+  content text,
+  embedding vector(1024), -- Chunk embedding
+  metadata jsonb,
+  created_at timestamp with time zone default now()
+);
+
+-- 5. Create search function for raw chunks
+create or replace function match_chunks (
+  query_embedding vector(1024),
+  match_threshold float,
+  match_count int
+)
+returns table (
+  id uuid,
+  file_source text,
+  content text,
+  similarity float
+)
+language plpgsql
+as $$
+begin
+  return query
+  select
+    kb.id,
+    kb.file_source,
+    kb.content,
+    1 - (kb.embedding <=> query_embedding) as similarity
+  from knowledge_base kb
+  where 1 - (kb.embedding <=> query_embedding) > match_threshold
+  order by similarity desc
+  limit match_count;
+end;
+$$;

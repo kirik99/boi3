@@ -49,7 +49,7 @@ HF_TOKEN=ваш_токен_huggingface
 ### 4. Запуск приложения
 
 ```powershell
-npm run dev
+cmd.exe /c npm run dev
 ```
 Приложение будет доступно по адресу: http://localhost:5000
 
