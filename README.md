@@ -4,63 +4,142 @@ AI-ассистент для лаборатории с поддержкой те
 
 ## Особенности
 
-- 🔬 **Специализация** — настроен на работу с лабораторными протоколами и методиками.
-- 🔍 **Умный RAG** — поиск информации напрямую в вашей базе Supabase (таблицы `documents` и `document_chunks`).
-- 🤖 **Модель Gemma 3** — использует современную модель `google/gemma-3-12b-it:free` через OpenRouter.
-- 💾 **Гибридное хранение** — история чатов хранится локально в `sqlite.db` для максимальной стабильности, а база знаний — в облаке Supabase.
-- 🖼️ **Мультимодальность** — возможность прикреплять изображения к запросам.
-
-## Быстрый старт
-
-### 1. Установка зависимостей
-
-```powershell
-# Node.js зависимости
-npm install
-
-# Python зависимости (для работы сервера эмбеддингов)
-pip install -r requirements.txt
-```
-
-### 2. Настройка окружения (.env)
-
-Создайте файл `.env` в корне проекта:
-
-```env
-OPENROUTER_API_KEY=ваш_ключ
-SUPABASE_URL=ваша_ссылка_supabase
-SUPABASE_KEY=ваш_ключ_supabase
-HF_TOKEN=ваш_токен_huggingface
-```
-
-### 3. Подготовка базы знаний
-
-1.  **Создание функции поиска**: Выполните SQL-запрос из файла `supabase_setup.sql` (или из инструкций в чате) в Supabase SQL Editor для настройки функции `match_chunks` под размер вектора 384.
-2.  **Индексация документов**:
-    Запустите сервер эмбеддингов в одном терминале:
-    ```powershell
-    python embedding_server.py
-    ```
-    Запустите скрипт индексации во втором терминале:
-    ```powershell
-    python rebuild_knowledge_base.py
-    ```
-
-### 4. Запуск приложения
-
-```powershell
-cmd.exe /c npm run dev
-```
-Приложение будет доступно по адресу: http://localhost:5000
+- 🔬 **Специализация** — лабораторные протоколы и методики анализа
+- 🔍 **RAG-поиск** — векторный поиск по базе знаний Supabase (`knowledge_base`)
+- 🤖 **DeepSeek / OpenRouter** — современные LLM через API
+- 💬 **Эмбеддинги** — `intfloat/multilingual-e5-large` через Hugging Face API (1024 dim)
+- 💾 **Кэширование** — SQLite кэш для эмбеддингов, ускоряет повторные запросы
+- 🖼️ **Мультимодальность** — поддержка изображений в чате
+- 🐳 **Docker** — полный стек в контейнерах
 
 ## Структура проекта
 
-- `client/` — Фронтенд на React + Vite.
-- `server/` — Бэкенд на Node.js (Express).
-- `shared/` — Общие схемы данных.
-- `rebuild_knowledge_base.py` — Скрипт для обновления базы знаний.
-- `embedding_server.py` — Локальный сервер для генерации векторов (384 dim).
-- `sqlite.db` — Локальная база истории чатов.
+```
+├── client/               # Фронтенд React + Vite
+├── server/               # Бэкенд Node.js (Express)
+├── shared/               # Общие схемы данных (Drizzle ORM)
+├── embedding_server.py   # Python-сервер эмбеддингов (порт 8000)
+├── embedding.py          # Логика генерации эмбеддингов (HF API)
+├── rag_pipeline.py       # RAG-пайплайн (поиск + контекст)
+├── rebuild_knowledge_base.py  # Индексация документов в Supabase
+├── structured_uploader.py     # Загрузчик структурированных данных
+├── docker-compose.yml    # Docker Compose конфиг
+├── Dockerfile            # Node.js контейнер
+├── Dockerfile.python     # Python контейнер
+└── .env.example          # Пример переменных окружения
+```
+
+---
+
+## 🚀 Развёртывание на сервере
+
+### 1. Клонирование репозитория
+
+```bash
+git clone https://github.com/kirik99/boi3.git
+cd boi3
+```
+
+### 2. Настройка переменных окружения
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Заполни `.env`:
+
+```env
+OPENROUTER_API_KEY=sk-or-...       # ключ OpenRouter (openrouter.ai/keys)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_KEY=eyJ...                # anon key из Supabase
+HF_TOKEN=hf_...                    # токен Hugging Face (hf.co/settings/tokens)
+DEEPSEEK_API_KEY=sk-...            # ключ DeepSeek (опционально)
+```
+
+### 3. Запуск через Docker (рекомендуется)
+
+```bash
+# Поднять все контейнеры
+docker compose up -d --build
+
+# Проверить логи
+docker compose logs -f
+```
+
+Приложение доступно: **http://your-server-ip:5000**  
+Сервер эмбеддингов: **http://your-server-ip:8000**
+
+### 4. Запуск без Docker (локально)
+
+```bash
+# Установить зависимости Node.js
+npm install
+
+# Установить зависимости Python
+pip install -r requirements.txt
+
+# Запустить сервер эмбеддингов (терминал 1)
+python embedding_server.py
+
+# Запустить основное приложение (терминал 2)
+npm run dev
+```
+
+Приложение: **http://localhost:5000**
+
+---
+
+## 📚 Наполнение базы знаний
+
+После запуска — проиндексируй документы:
+
+```bash
+# Внутри контейнера
+docker compose exec embedding python rebuild_knowledge_base.py
+
+# Или локально
+python embedding_server.py          # терминал 1
+python rebuild_knowledge_base.py    # терминал 2
+```
+
+### Supabase — настройка функции поиска
+
+В **Supabase SQL Editor** создай функцию для векторного поиска (1024 dim):
+
+```sql
+CREATE OR REPLACE FUNCTION match_chunks(
+  query_embedding vector(1024),
+  match_threshold float DEFAULT 0.5,
+  match_count int DEFAULT 5
+)
+RETURNS TABLE (
+  id bigint,
+  content text,
+  metadata jsonb,
+  similarity float
+)
+LANGUAGE sql STABLE
+AS $$
+  SELECT id, content, metadata,
+    1 - (embedding <=> query_embedding) AS similarity
+  FROM knowledge_base
+  WHERE 1 - (embedding <=> query_embedding) > match_threshold
+  ORDER BY embedding <=> query_embedding
+  LIMIT match_count;
+$$;
+```
+
+---
+
+## 🔄 Обновление приложения на сервере
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+---
 
 ## Лицензия
 
