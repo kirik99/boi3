@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - VITE_EMBEDDING_SERVER_URL=http://embedding:8000
+    env_file:
+      - .env
+    depends_on:
+      - embedding
+
+  embedding:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./sqlite.db:/app/sqlite.db
+      - ./embedding_cache.db:/app/embedding_cache.db
+      - ./rag_cache.db:/app/rag_cache.db

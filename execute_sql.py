@@ -18,16 +18,19 @@ def get_connection():
 
     # 2. Try to construct direct hostname (bypassing pooler if possible)
     # The project ref is likely in the URL
-    project_ref = "inlnzpjewdyovotnidsy" 
-    password = "LG6ihuTHFr8vA550"
+    project_ref = os.getenv("SUPABASE_PROJECT_REF")
+    password = os.getenv("SUPABASE_DB_PASSWORD")
     
-    direct_url = f"postgresql://postgres:{password}@db.{project_ref}.supabase.co:5432/postgres"
-    try:
-        print("Attempting direct connection to db.inlnzpjewdyovotnidsy.supabase.co...")
-        return psycopg2.connect(direct_url)
-    except Exception as e:
-        print(f"Direct construction failed: {e}")
-        raise e
+    if project_ref and password:
+        direct_url = f"postgresql://postgres:{password}@db.{project_ref}.supabase.co:5432/postgres"
+        try:
+            print(f"Attempting direct connection to db.{project_ref}.supabase.co...")
+            return psycopg2.connect(direct_url)
+        except Exception as e:
+            print(f"Direct construction failed: {e}")
+            raise e
+    
+    raise Exception("Could not establish database connection. Please check DATABASE_URL or SUPABASE_PROJECT_REF/SUPABASE_DB_PASSWORD environment variables.")
 
 def execute_sql_file(file_path):
     print(f"Executing {file_path}...")

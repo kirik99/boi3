@@ -1,9 +1,16 @@
 import os
 import requests
 import logging
+import sqlite3
+import json
 from supabase import create_client
 from dotenv import load_dotenv
 from embedding import get_embedding
+
+# Setup exact match cache for RAG
+rag_cache_conn = sqlite3.connect('rag_cache.db', check_same_thread=False)
+rag_cache_conn.execute('CREATE TABLE IF NOT EXISTS rag_cache (query TEXT PRIMARY KEY, result TEXT)')
+rag_cache_conn.commit()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -143,8 +150,14 @@ def internet_search_fallback(query):
     return []
 
 def rag_query(query):
-    """Main RAG Pipeline."""
+    """Main RAG Pipeline с точным кэшированием (Exact Match)."""
     logger.info(f"🚀 Processing RAG query: {query}")
+    
+    # Check cache first
+    cached = rag_cache_conn.execute('SELECT result FROM rag_cache WHERE query = ?', (query,)).fetchone()
+    if cached:
+        logger.info(f"✨ Found exact match in cache for query: {query}")
+        return json.loads(cached[0])
     
     # Check if user explicitly asks for internet
     force_internet = any(word in query.lower() for word in ["интернет", "сеть", "internet", "web"])
@@ -170,13 +183,19 @@ def rag_query(query):
         all_results.extend(results)
         found_locally = True
     
-    # 3. Fallback: Internet (only if nothing local or user explicitly asked)
+    # 3. Fallback: Internet
     if not found_locally or force_internet:
         internet_results = internet_search_fallback(query)
         all_results.extend(internet_results)
-        return {"results": all_results, "source": "mixed" if found_locally else "internet"}
+        res = {"results": all_results, "source": "mixed" if found_locally else "internet"}
+        rag_cache_conn.execute('INSERT OR REPLACE INTO rag_cache (query, result) VALUES (?, ?)', (query, json.dumps(res)))
+        rag_cache_conn.commit()
+        return res
     
-    return {"results": all_results, "source": "database"}
+    res = {"results": all_results, "source": "database"}
+    rag_cache_conn.execute('INSERT OR REPLACE INTO rag_cache (query, result) VALUES (?, ?)', (query, json.dumps(res)))
+    rag_cache_conn.commit()
+    return res
 
 if __name__ == "__main__":
     # Test

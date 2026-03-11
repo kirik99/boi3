@@ -22,7 +22,11 @@ const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 
 // Configure Supabase
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://inlnzpjewdyovotnidsy.supabase.co";
-const SUPABASE_KEY = process.env.SUPABASE_KEY || "sb_publishable_SvR40SEMeUYzgOc_D8vlcA_fc8ocp23";
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
+
+if (!SUPABASE_KEY) {
+  console.warn("SUPABASE_KEY is not defined in environment variables!");
+}
 
 if (DEEPSEEK_API_KEY) {
   console.log(`[DeepSeek] API Key loaded (length: ${DEEPSEEK_API_KEY.length})`);

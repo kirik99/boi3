@@ -1,0 +1,7 @@
+node_modules
+dist
+.git
+.idea
+__pycache__
+*.db-journal
+.env

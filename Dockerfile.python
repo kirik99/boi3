@@ -1,0 +1,18 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Enable unbuffered logging
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+
+# Install dependencies including the ones needed for the server
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir flask flask-cors huggingface_hub
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["python", "embedding_server.py"]
