@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 services:
   web:
@@ -12,8 +12,12 @@ services:
       - VITE_EMBEDDING_SERVER_URL=http://embedding:8000
     env_file:
       - .env
+    dns:
+      - 8.8.8.8
     depends_on:
       - embedding
+    volumes:
+      - ./sqlite.db:/app/sqlite.db
 
   embedding:
     build:

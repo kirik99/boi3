@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import fetch from "node-fetch";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
@@ -20,7 +19,10 @@ export async function fetchInternetInfo(query: string): Promise<string> {
  */
 async function getEmbedding(text: string): Promise<number[]> {
   try {
-    const response = await fetch('http://localhost:8000/embed', {
+    const EMBEDDING_SERVER_URL = process.env.VITE_EMBEDDING_SERVER_URL || 'http://localhost:8000';
+    // Inside Docker, 'localhost' won't work if it's supposed to hit another container, 
+    // but the environment variable VITE_EMBEDDING_SERVER_URL is set to 'http://embedding:8000' in docker-compose.yml
+    const response = await fetch(`${EMBEDDING_SERVER_URL}/embed`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
@@ -45,7 +47,8 @@ export async function searchChunks(query: string, limit = 5) {
   console.log(`[RAG] Querying Python RAG service: "${query}"`);
 
   try {
-    const response = await fetch('http://localhost:8000/rag', {
+    const EMBEDDING_SERVER_URL = process.env.VITE_EMBEDDING_SERVER_URL || 'http://localhost:8000';
+    const response = await fetch(`${EMBEDDING_SERVER_URL}/rag`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, limit })

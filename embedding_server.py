@@ -6,6 +6,18 @@ from rag_pipeline import rag_query
 app = Flask(__name__)
 CORS(app)
 
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        'status': 'online',
+        'service': 'embedding-rag-server',
+        'endpoints': ['/embed (POST)', '/rag (POST)', '/health (GET)']
+    })
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok'})
+
 @app.route('/embed', methods=['POST'])
 def embed():
     data = request.json
