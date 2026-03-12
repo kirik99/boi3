@@ -150,7 +150,7 @@ def internet_search_fallback(query):
     return []
 
 def rag_query(query):
-    """Main RAG Pipeline с точным кэшированием (Exact Match)."""
+    """Main RAG Pipeline using unified knowledge_base table."""
     logger.info(f"🚀 Processing RAG query: {query}")
     
     # Check cache first
@@ -169,43 +169,44 @@ def rag_query(query):
         return {"results": [], "source": "None"}
 
     all_results = []
-    found_locally = False
-
-    # 1. High Priority: Lab Methods
-    results = retrieve_from_lab_methods(query, embedding)
-    if results:
-        all_results.extend(results)
-        found_locally = True
     
-    # 2. Vector Search: Knowledge Base
-    results = retrieve_from_knowledge_base(query, embedding)
-    if results:
-        all_results.extend(results)
-        found_locally = True
+    # Unified Search in knowledge_base (Table 2) 
+    kb_results = retrieve_from_knowledge_base(query, embedding)
+    if kb_results:
+        all_results.extend(kb_results)
     
-    # 3. Fallback: Internet
-    if not found_locally or force_internet:
+    # Optional Fallback: Internet
+    source = "database"
+    if not all_results or force_internet:
         internet_results = internet_search_fallback(query)
-        all_results.extend(internet_results)
-        res = {"results": all_results, "source": "mixed" if found_locally else "internet"}
-        rag_cache_conn.execute('INSERT OR REPLACE INTO rag_cache (query, result) VALUES (?, ?)', (query, json.dumps(res)))
-        rag_cache_conn.commit()
-        return res
+        if internet_results:
+            all_results.extend(internet_results)
+            source = "mixed" if all_results else "internet"
     
-    res = {"results": all_results, "source": "database"}
+    # Limit total results to 8 to provide more context to the ML model
+    all_results = all_results[:8]
+    
+    res = {"results": all_results, "source": source}
     rag_cache_conn.execute('INSERT OR REPLACE INTO rag_cache (query, result) VALUES (?, ?)', (query, json.dumps(res)))
     rag_cache_conn.commit()
     return res
 
 if __name__ == "__main__":
+    import sys
+    # Force UTF-8 for windows terminal
+    if sys.platform == "win32":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
     # Test
     test_q = "какое оборудование есть в лаборатории"
     response: dict = rag_query(test_q)
     print(f"\nFinal Response for '{test_q}' (Source: {response.get('source')}):")
     results = response.get('results', [])
     for r in results:
-        # Use explicit dict access to avoid lint issues
         if isinstance(r, dict):
             src = r.get('source', 'Unknown')
             cnt = r.get('content', '')
-            print(f"[{src}] {str(cnt)[:100]}...")
+            # Convert to string and slice safely
+            content_str = str(cnt)[:100].replace('\n', ' ')
+            print(f"[{src}] {content_str}...")

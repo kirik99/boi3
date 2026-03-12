@@ -232,22 +232,21 @@ def process_file(file_path, base_dir):
         embedding = get_embedding(search_text)
         
         data = {
-            "method_name": name,
-            "preparation": p.get("preparation", ""),
-            "calibration": p.get("calibration", ""),
-            "measurement": p.get("measurement", ""),
-            "spectro_setup": p.get("spectro_setup", ""),
-            "file_source": p["file_source"],
+            "file_source": p.get("file_source", "Unknown"),
+            "category": "Structured Method",
+            "step_type": "Method",
+            "content": search_text,
             "embedding": embedding,
             "metadata": {
-                "source": p["file_source"],
+                "source": p.get("file_source", "Unknown"),
+                "method_name": name,
                 "processed_at": time.strftime('%Y-%m-%d %H:%M:%S')
             }
         }
         
         try:
-            supabase.table("lab_methods").insert(data).execute()
-            print(f"  [SUCCESS] Saved: {name}")
+            supabase.table("knowledge_base").insert(data).execute()
+            print(f"  [SUCCESS] Saved: {name} to knowledge_base")
         except Exception as e:
             print(f"  [ERROR] Failed to save {name}: {e}")
 

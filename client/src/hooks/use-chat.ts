@@ -4,11 +4,22 @@ import type { Conversation, Message } from "@shared/schema";
 // Using the routes provided by the Replit AI integration
 const API_BASE = "/api";
 
+// Helper to get or create a stable userId in localStorage
+function getUserId() {
+  let userId = localStorage.getItem("nexus_user_id");
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem("nexus_user_id", userId);
+  }
+  return userId;
+}
+
 export function useConversations() {
+  const userId = getUserId();
   return useQuery<Conversation[]>({
-    queryKey: [`${API_BASE}/conversations`],
+    queryKey: [`${API_BASE}/conversations`, userId],
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/conversations`);
+      const res = await fetch(`${API_BASE}/conversations?userId=${userId}`);
       if (!res.ok) throw new Error("Failed to fetch conversations");
       return res.json();
     },
@@ -29,24 +40,26 @@ export function useConversation(id: number | null) {
 
 export function useCreateConversation() {
   const queryClient = useQueryClient();
+  const userId = getUserId();
   return useMutation({
     mutationFn: async (title: string) => {
       const res = await fetch(`${API_BASE}/conversations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify({ title, userId }),
       });
       if (!res.ok) throw new Error("Failed to create conversation");
       return res.json() as Promise<Conversation>;
     },
-    onSuccess: (newConv) => {
-      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/conversations`] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/conversations`, userId] });
     },
   });
 }
 
 export function useDeleteConversation() {
   const queryClient = useQueryClient();
+  const userId = getUserId();
   return useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`${API_BASE}/conversations/${id}`, {
@@ -55,7 +68,7 @@ export function useDeleteConversation() {
       if (!res.ok) throw new Error("Failed to delete conversation");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/conversations`] });
+      queryClient.invalidateQueries({ queryKey: [`${API_BASE}/conversations`, userId] });
     },
   });
 }

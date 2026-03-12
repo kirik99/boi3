@@ -3,9 +3,9 @@ import { db } from "./db";
 import { eq, desc, asc } from "drizzle-orm";
 
 export interface IStorage {
-  getConversations(): Promise<Conversation[]>;
+  getConversations(userId?: string): Promise<Conversation[]>;
   getConversation(id: number): Promise<Conversation | undefined>;
-  createConversation(title: string): Promise<Conversation>;
+  createConversation(title: string, userId?: string): Promise<Conversation>;
   deleteConversation(id: number): Promise<void>;
 
   getMessages(conversationId: number): Promise<Message[]>;
@@ -13,7 +13,10 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getConversations(): Promise<Conversation[]> {
+  async getConversations(userId?: string): Promise<Conversation[]> {
+    if (userId) {
+      return await db.select().from(conversations).where(eq(conversations.userId, userId)).orderBy(desc(conversations.createdAt));
+    }
     return await db.select().from(conversations).orderBy(desc(conversations.createdAt));
   }
 
@@ -22,8 +25,8 @@ export class DatabaseStorage implements IStorage {
     return conversation;
   }
 
-  async createConversation(title: string): Promise<Conversation> {
-    const [conversation] = await db.insert(conversations).values({ title }).returning();
+  async createConversation(title: string, userId?: string): Promise<Conversation> {
+    const [conversation] = await db.insert(conversations).values({ title, userId }).returning();
     return conversation;
   }
 

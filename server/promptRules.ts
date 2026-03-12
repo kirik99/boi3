@@ -139,26 +139,36 @@ export function buildModelClarificationPrompt(models: string[]): string {
 
 /**
  * Build strict formatted response for instrument queries
- * Rule 3: Build answer with exact structure
+ * Rule 3: Build answer with exact structure - improved to be selective
  */
 export function buildInstrumentResponse(
   instrument: string,
   calibration: string | null,
   methodology: string | null,
   fromInternet: boolean,
-  notInDatabase: boolean
+  notInDatabase: boolean,
+  userQuery: string = ""
 ): string {
+  const lowerQuery = userQuery.toLowerCase();
+  const wantsCalibration = ['калибровк', 'calibrate', 'настройк'].some(w => lowerQuery.includes(w)) || !lowerQuery.includes('измерен');
+  const wantsMethodology = ['измерен', 'метод', 'инструкц', 'как работа', 'measure', 'method', 'instruction'].some(w => lowerQuery.includes(w)) || !lowerQuery.includes('калибровк');
+
   let response = `Прибор: ${instrument}\n\n`;
   
   if (fromInternet) {
     response += `⚠️ Информация получена из внешних источников.\n\n`;
   }
   
-  response += `Калибровка:\n${calibration || 'Информация отсутствует'}\n\n`;
-  response += `Методика измерения:\n${methodology || 'Информация отсутствует'}\n\n`;
+  if (wantsCalibration || !userQuery) {
+    response += `### Калибровка:\n${calibration || 'Информация о калибровке для данной модели в базе отсутствует'}\n\n`;
+  }
+  
+  if (wantsMethodology || !userQuery) {
+    response += `### Методика измерения:\n${methodology || 'Информация о методике измерения для данной модели в базе отсутствует'}\n\n`;
+  }
   
   if (notInDatabase && !fromInternet) {
-    response += `⚠️ Данная информация отсутствует в базе знаний.\n`;
+    response += `⚠️ Детальная информация по вашему запросу отсутствует в нашей базе знаний. Я привел общие данные, если они были найдены.\n`;
   }
   
   return response;

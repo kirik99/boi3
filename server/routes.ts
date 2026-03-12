@@ -75,7 +75,8 @@ export async function registerRoutes(
 
   // Conversations API
   app.get("/api/conversations", async (req, res) => {
-    const conversations = await storage.getConversations();
+    const userId = req.query.userId as string | undefined;
+    const conversations = await storage.getConversations(userId);
     res.json(conversations);
   });
 
@@ -90,8 +91,8 @@ export async function registerRoutes(
   });
 
   app.post("/api/conversations", async (req, res) => {
-    const { title } = req.body;
-    const conversation = await storage.createConversation(title || "New Chat");
+    const { title, userId } = req.body;
+    const conversation = await storage.createConversation(title || "New Chat", userId);
     res.status(201).json(conversation);
   });
 
@@ -227,7 +228,8 @@ export async function registerRoutes(
             finalCalibration,
             finalMethodology,
             fromInternet,
-            !foundInDatabase && !fromInternet
+            !foundInDatabase && !fromInternet,
+            content
           );
       } else {
           // For general questions, provide a more natural conversational context

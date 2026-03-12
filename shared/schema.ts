@@ -7,6 +7,7 @@ import { z } from "zod";
 export const conversations = sqliteTable("conversations", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
+  userId: text("user_id"), // Added for user-specific chats
   createdAt: integer("created_at", { mode: "timestamp" }).$defaultFn(() => new Date()),
 });
 
