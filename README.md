@@ -59,6 +59,18 @@ DEEPSEEK_API_KEY=sk-...            # ключ DeepSeek (опционально)
 
 ### 3. Запуск через Docker (рекомендуется)
 
+**Важно:** Перед первым запуском Docker необходимо создать пустые файлы баз данных (иначе Docker создаст вместо них папки и приложение упадет с ошибкой).
+
+В терминале **PowerShell** (Windows) выполните:
+```powershell
+New-Item -ItemType File -Name sqlite.db; New-Item -ItemType File -Name embedding_cache.db; New-Item -ItemType File -Name rag_cache.db
+```
+
+В терминале **Bash** (Linux/macOS) выполните:
+```bash
+touch sqlite.db embedding_cache.db rag_cache.db
+```
+
 ```bash
 # Поднять все контейнеры
 docker compose up -d --build
