@@ -1,158 +1,117 @@
-# Laboratory AI Assistant (MML Agent)
+# Интеллектуальный Лабораторный Ассистент (MML Agent)
 
-AI-ассистент для лаборатории с поддержкой текста, изображений и интеллектуального поиска по базе знаний (RAG).
-
-## Особенности
-
-- 🔬 **Специализация** — лабораторные протоколы и методики анализа
-- 🔍 **RAG-поиск** — векторный поиск по базе знаний Supabase (`knowledge_base`)
-- 🤖 **DeepSeek / OpenRouter** — современные LLM через API
-- 💬 **Эмбеддинги** — `intfloat/multilingual-e5-large` через Hugging Face API (1024 dim)
-- 💾 **Кэширование** — SQLite кэш для эмбеддингов, ускоряет повторные запросы
-- 🖼️ **Мультимодальность** — поддержка изображений в чате
-- 🐳 **Docker** — полный стек в контейнерах
-
-## Структура проекта
-
-```
-├── client/               # Фронтенд React + Vite
-├── server/               # Бэкенд Node.js (Express)
-├── shared/               # Общие схемы данных (Drizzle ORM)
-├── embedding_server.py   # Python-сервер эмбеддингов (порт 8000)
-├── embedding.py          # Логика генерации эмбеддингов (HF API)
-├── rag_pipeline.py       # RAG-пайплайн (поиск + контекст)
-├── rebuild_knowledge_base.py  # Индексация документов в Supabase
-├── structured_uploader.py     # Загрузчик структурированных данных
-├── docker-compose.yml    # Docker Compose конфиг
-├── Dockerfile            # Node.js контейнер
-├── Dockerfile.python     # Python контейнер
-└── .env.example          # Пример переменных окружения
-```
+Исследовательский проект аспирантуры по разработке мультимодального ИИ-ассистента для оптимизации работы с 
+лабораторными протоколами, методиками анализа и документацией на базе архитектуры **Advanced RAG** (Retrieval-Augmented Generation).
 
 ---
 
-## 🚀 Развёртывание на сервере
+## 🔬 Научная новизна и архитектура решения
 
-### 1. Клонирование репозитория
+Проект решает фундаментальную проблему "зашумления" контекста большими текстовыми массивами при поиске узкоспециализированных лабораторных инструкций. Для этого реализован многоступенчатый пайплайн извлечения данных:
 
-```bash
-git clone https://github.com/kirik99/boi3.git
-cd boi3
-```
+### 1. Архитектура Advanced RAG
+- **Query Expansion (Расширение запроса):** Исходный запрос пользователя на лету обрабатывается через LLM (DeepSeek) для генерации 3-5 научных синонимов и химических аббревиатур (например, *ABTS -> 2,2'-azino-bis(3-ethylbenzothiazoline-6-sulfonic acid)*). Это многократно повышает точность векторного матчинга.
+- **Многоязычные эмбеддинги:** Использование полносвязной модели `intfloat/multilingual-e5-large` (Hugging Face) для перевода текста в 1024-мерные векторы, захватывающие семантику как на русском, так и на английском языках.
+- **Гибридный поиск (Hybrid Retrieval):** Интеграция косинусного сходства (Vector Search via `pgvector`) с лексическим фоллбэком (Keyword Тext Search) в базе данных PostgreSQL.
 
-### 2. Настройка переменных окружения
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Заполни `.env`:
-
-```env
-OPENROUTER_API_KEY=sk-or-...       # ключ OpenRouter (openrouter.ai/keys)
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=eyJ...                # anon key из Supabase
-HF_TOKEN=hf_...                    # токен Hugging Face (hf.co/settings/tokens)
-DEEPSEEK_API_KEY=sk-...            # ключ DeepSeek (опционально)
-```
-
-### 3. Запуск через Docker (рекомендуется)
-
-**Важно:** Перед первым запуском Docker необходимо создать пустые файлы баз данных (иначе Docker создаст вместо них папки и приложение упадет с ошибкой).
-
-В терминале **PowerShell** (Windows) выполните:
-```powershell
-New-Item -ItemType File -Name sqlite.db; New-Item -ItemType File -Name embedding_cache.db; New-Item -ItemType File -Name rag_cache.db
-```
-
-В терминале **Bash** (Linux/macOS) выполните:
-```bash
-touch sqlite.db embedding_cache.db rag_cache.db
-```
-
-```bash
-# Поднять все контейнеры
-docker compose up -d --build
-
-# Проверить логи
-docker compose logs -f
-```
-
-Приложение доступно: **http://your-server-ip:5000**  
-Сервер эмбеддингов: **http://your-server-ip:8000**
-
-### 4. Запуск без Docker (локально)
-
-```bash
-# Установить зависимости Node.js
-npm install
-
-# Установить зависимости Python
-pip install -r requirements.txt
-
-# Запустить сервер эмбеддингов (терминал 1)
-python embedding_server.py
-
-# Запустить основное приложение (терминал 2)
-npm run dev
-```
-
-Приложение: **http://localhost:5000**
+### 2. Эвристическое реранжирование (Diversity & Heuristic Reranking)
+Классический RAG страдает от доминирования длинных документов (например, теоретических учебников) над короткими (рабочие инструкции). В проекте реализован кастомный алгоритм реранжирования:
+1. **Diversity Filter:** БД возвращает расширенную выборку (до 50 чанков), но пайплайн отбирает не более 2 фрагментов из одного файла.
+2. **Scoring Function:** Окончательная релевантность пересчитывается с учетом математических штрафов за превышение объема текста и огромных бонусов за наличие кириллицы. Это гарантирует приоритет локальных русскоязычных методик.
 
 ---
 
-## 📚 Наполнение базы знаний
+## 🧩 Технологический стек
 
-После запуска — проиндексируй документы:
+* **Frontend:** React 18, Vite, TailwindCSS, ReactMarkdown (стриминг ответов), Lucide Icons.
+* **Backend (API & Chat):** Node.js, Express, Drizzle ORM (управление сессиями).
+* **Backend (AI & ML):** Python 3.10, Flask, HuggingFace Hub.
+* **Database & Vector Store:** Supabase (PostgreSQL + `pgvector`).
+* **LLM Engine:** DeepSeek (`deepseek-chat`) / OpenRouter.
 
-```bash
-# Внутри контейнера
-docker compose exec embedding python rebuild_knowledge_base.py
+---
 
-# Или локально
-python embedding_server.py          # терминал 1
-python rebuild_knowledge_base.py    # терминал 2
-```
+## 🗄️ Структура Базы Данных (Supabase)
 
-### Supabase — настройка функции поиска
+Основой системы является унифицированная таблица `knowledge_base` и RPC-функция для расчета косинусного расстояния.
 
-В **Supabase SQL Editor** создай функцию для векторного поиска (1024 dim):
+### Таблица `knowledge_base`
+- `id` (bigint, PK) — Уникальный идентификатор.
+- `file_source` (text) — Исходный файл (например, `3.docx`, `Food_Analysis.pdf`).
+- `category` & `step_type` (text) — Метаданные категоризации метода.
+- `content` (text) — Извлеченный текстовый фрагмент (chunk).
+- `embedding` (vector(1024)) — Векторное представление текста.
+- `metadata` (jsonb) — Дополнительные JSON-параметры.
 
+### RPC-Функция матчинга
+Вычисление метрики `1 - (embedding <=> query_embedding)`:
 ```sql
 CREATE OR REPLACE FUNCTION match_chunks(
   query_embedding vector(1024),
-  match_threshold float DEFAULT 0.5,
-  match_count int DEFAULT 5
+  match_threshold float DEFAULT 0.12,
+  match_count int DEFAULT 30
 )
-RETURNS TABLE (
-  id bigint,
-  content text,
-  metadata jsonb,
-  similarity float
-)
-LANGUAGE sql STABLE
-AS $$
-  SELECT id, content, metadata,
-    1 - (embedding <=> query_embedding) AS similarity
+RETURNS TABLE (id bigint, content text, file_source text, similarity float)
+LANGUAGE sql STABLE AS $$
+  SELECT id, content, file_source, 1 - (embedding <=> query_embedding) AS similarity
   FROM knowledge_base
   WHERE 1 - (embedding <=> query_embedding) > match_threshold
-  ORDER BY embedding <=> query_embedding
-  LIMIT match_count;
+  ORDER BY embedding <=> query_embedding LIMIT match_count;
 $$;
 ```
 
 ---
 
-## 🔄 Обновление приложения на сервере
+## 📁 Топология проекта
 
-```bash
-git pull
-docker compose up -d --build
+```text
+├── client/                     # Фронтенд (UI чата, сессии, рендеринг Markdown)
+├── server/                     # Главный Node.js сервер (API, логика диалогов)
+├── ai/                         # RAG-пайплайн и ML микросервис
+│   ├── embedding_server.py     # Flask-сервер (порт 8000) для оркестрации
+│   ├── embedding.py            # Интеграция с HuggingFace E5-Large
+│   ├── rag_pipeline.py         # Ядро системы (Query Expansion, Retrieval, Reranking)
+│   ├── universal_uploader.py   # Конвейер парсинга PDF/DOCX и ингестии в Supabase
+│   └── structured_uploader.py  # LLM-assisted парсинг сложных структурированных методик
+├── shared/                     # Drizzle ORM схемы
+├── Dockerfile                  # Изоляция Node.js окружения
+├── Dockerfile.python           # Изоляция ML окружения
+└── docker-compose.yml          # Оркестрация мультиконтейнерного деплоя
 ```
 
 ---
 
-## Лицензия
+## 🚀 Деплой и развертывание
 
-MIT
+### Подготовка окружения
+Создайте файл `.env` в корне проекта (см. `.env.example`):
+```env
+SUPABASE_URL=https://[YOUR_INSTANCE].supabase.co
+SUPABASE_KEY=[YOUR_SERVICE_KEY]
+HF_TOKEN=[YOUR_HUGGINGFACE_TOKEN]
+DEEPSEEK_API_KEY=[YOUR_DEEPSEEK_KEY]
+```
+
+### Запуск через Docker
+```bash
+# Инициализация кэш-баз
+touch sqlite.db rag_cache.db
+
+# Запуск изолированного кластера
+docker compose up -d --build
+```
+
+### Локальный запуск (Development Mode)
+```bash
+# Терминал 1 (Python ML Microservice)
+cd ai
+python embedding_server.py
+
+# Терминал 2 (Node.js API & React Webpack)
+npm install
+npm run dev
+```
+
+---
+
+*Документация подготовлена для демонстрации и защиты исследовательского ИИ-проекта.*
