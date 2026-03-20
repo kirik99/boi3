@@ -257,7 +257,7 @@ export async function registerRoutes(
       }
 
       // Explicit instruction to LLM about source mentioning
-      systemContent += `\n\nПри ответе обязательно укажи, если информация взята из интернета. Если информация взята из нашей базы, отвечай уверенно как ассистент нашей лаборатории.`;
+      systemContent += `\n\nПри ответе обязательно укажи, если информация взята из интернета. Если информация взята из нашей базы, отвечай уверенно как ассистент нашей лаборатории, но ОБЯЗАТЕЛЬНО укажи названия исходных документов (source), на которые опирается твой ответ.`;
 
       console.log(`[Chat] Instrument: ${instrumentName}`);
       console.log(`[Chat] Found in Database: ${foundInDatabase}`);

@@ -4,7 +4,7 @@ Write-Host "=== Multi-Modal Agent Startup ===" -ForegroundColor Cyan
 
 # Терминал 1: Embedding сервер
 Write-Host "`n[1/2] Starting embedding server..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "python embedding_server.py" -WindowStyle Normal
+Start-Process powershell -ArgumentList "python ai/embedding_server.py" -WindowStyle Normal
 
 Start-Sleep -Seconds 2
 

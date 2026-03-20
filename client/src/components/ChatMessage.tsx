@@ -43,7 +43,7 @@ export function ChatMessage({ role, content, imageUrl, isStreaming }: ChatMessag
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
-            {isBot ? "Nexus AI" : "You"}
+            {isBot ? "Лабораторный помощник" : "Вы"}
           </span>
           
           {isBot && (
@@ -68,14 +68,12 @@ export function ChatMessage({ role, content, imageUrl, isStreaming }: ChatMessag
               className="rounded-lg max-h-60 mb-4 border border-white/10 object-contain bg-black/20"
             />
           )}
-          {isStreaming ? (
-            <div>
-              {content}
-              <span className="inline-block w-2 h-4 ml-1 align-middle bg-primary animate-pulse" />
-            </div>
-          ) : (
+          <div className="relative">
             <ReactMarkdown>{content}</ReactMarkdown>
-          )}
+            {isStreaming && (
+              <span className="inline-block w-2 h-4 ml-1 mt-1 align-middle bg-primary animate-pulse" />
+            )}
+          </div>
         </div>
       </div>
     </motion.div>

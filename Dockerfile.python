@@ -15,4 +15,4 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["python", "embedding_server.py"]
+CMD ["python", "ai/embedding_server.py"]

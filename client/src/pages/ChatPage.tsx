@@ -96,7 +96,7 @@ export default function ChatPage() {
             <Menu className="w-6 h-6" />
           </button>
           <span className="ml-3 font-semibold text-lg truncate">
-            {conversationData?.title || "Nexus AI"}
+            {conversationData?.title || "Лабораторный помощник"}
           </span>
         </div>
 
@@ -109,14 +109,14 @@ export default function ChatPage() {
                 <Bot className="w-10 h-10 text-white" />
               </div>
               <h2 className="text-4xl md:text-5xl font-bold mb-4">
-                How can I help you today?
+                Чем я могу помочь?
               </h2>
               <p className="text-xl text-muted-foreground max-w-lg mb-10">
-                I'm Nexus, your advanced AI assistant. I can help you with coding, writing, analysis, and more.
+                Я ваш Лабораторный помощник. Помогу с поиском инструкций, методик и оборудования.
               </p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full">
-                {["Explain quantum computing", "Write a Python script", "Draft a professional email", "Analyze this data"].map((prompt) => (
+                {["Какое оборудование есть в лаборатории?", "Как настроить спектрометр?", "Инструкции по пробоподготовке", "Калибровка влагомера"].map((prompt) => (
                   <button
                     key={prompt}
                     onClick={() => handleSend(prompt)}
